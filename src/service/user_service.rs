@@ -168,5 +168,17 @@ impl UserService {
             .get_result::<Group>(&mut self.conn);
         Ok(())
     }
-    
+    fn is_admin(user: &User, group: &Group, conn: &mut PgConnection) -> bool {
+        use crate::schema::group_user::dsl::*;
+        let user = group_user
+            .filter(BoolExpressionMethods::and(
+                BoolExpressionMethods::and(group_id.eq(group.id), user_id.eq(user.id)),
+                user_role.eq(UserRole::Admin),
+            ))
+            .first::<GroupUser>(conn);
+        match user {
+            Ok(..) => true,
+            Err(..) => false,
+        }
+    }
 }

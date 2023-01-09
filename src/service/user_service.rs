@@ -241,7 +241,7 @@ impl UserService {
             }
         }
     }
-        pub fn retire(&mut self, caller_name: &String, group_name: &String) -> Result<(), ()> {
+    pub fn retire(&mut self, caller_name: &String, group_name: &String) -> Result<(), ()> {
         if !Self::is_user_in_database(&caller_name) {
             println!("User {} was not found in database", caller_name);
             return Err(());
@@ -345,6 +345,81 @@ impl UserService {
         use crate::schema::groups::dsl::*;
         diesel::dsl::delete(groups.filter(id.eq(group.id))).get_result::<Group>(&mut self.conn);
         println!("User {} deleted the group {}", caller.name, group_name);
+        Ok(())
+    }
+    pub fn start_secret_santa(
+        &mut self,
+        caller_name: &String,
+        group_name: &String,
+    ) -> Result<(), ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller_name, group.name);
+            return Err(());
+        }
+        if !Self::is_admin(&caller, &group, &mut self.conn) {
+            println!(
+                "User {} can not delete the group {} due to no admin rights",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        if group.status == GroupStatus::Closed {
+            println!(
+                "User {} can not start the game because the group {} because it is closed",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        use crate::schema::group_user::dsl::*;
+        let mut user_id_vec = group_user
+            .filter(group_id.eq(group.id))
+            .select(user_id)
+            .load::<i32>(&mut self.conn)
+            .unwrap();
+        if user_id_vec.len() <= 2 {
+            println!(
+                "Can not start the game for the group {} due to too little number of participants",
+                group_name
+            );
+            return Err(());
+        }
+        use rand::seq::SliceRandom;
+        use rand::thread_rng;
+        user_id_vec.shuffle(&mut thread_rng());
+        let mut shifted_user_id_vec = user_id_vec.clone();
+        Self::shift_left(&mut shifted_user_id_vec);
+        for i in 0..user_id_vec.len() {
+            let res = diesel::dsl::update(group_user.filter(BoolExpressionMethods::and(
+                user_id.eq(user_id_vec[i]),
+                group_id.eq(group.id),
+            )))
+            .set(ward_id.eq(shifted_user_id_vec[i]))
+            .get_result::<GroupUser>(&mut self.conn);
+            match res {
+                Ok(..) => {}
+                Err(..) => {
+                    println!("Error occured trying to set ward. Please start the game again.");
+                    return Err(());
+                }
+            }
+        }
+        println!(
+            "Game for group {} has been started successfully by user {}",
+            group_name, caller.name
+        );
+        println!("{:?}", user_id_vec);
+        println!("{:?}", shifted_user_id_vec);
+        self.close_group(&caller, &group);
         Ok(())
     }
     fn shift_left(arr: &mut Vec<i32>) {

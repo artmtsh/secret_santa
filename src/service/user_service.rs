@@ -181,4 +181,64 @@ impl UserService {
             Err(..) => false,
         }
     }
+    pub fn set_admin(
+        &mut self,
+        caller_name: &String,
+        new_admin_name: &String,
+        group_name: &String,
+    ) -> Result<(), ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_user_in_database(&new_admin_name) {
+            println!("User {} was not found in database", new_admin_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let new_admin = UserService::new().get_user_by_name(new_admin_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller.name, group_name);
+            return Err(());
+        }
+        if !Self::is_user_in_group(&new_admin, &group, &mut self.conn) {
+            println!(
+                "User {} was not found in group {}",
+                new_admin.name, group_name
+            );
+            return Err(());
+        }
+        if !Self::is_admin(&caller, &group, &mut self.conn) {
+            println!("User {} is not admin in group {}", caller.name, group.name);
+            return Err(());
+        }
+        use crate::schema::group_user::dsl::*;
+        let res = diesel::update(group_user.filter(BoolExpressionMethods::and(
+            user_id.eq(new_admin.id),
+            group_id.eq(group.id),
+        )))
+        .set(user_role.eq(UserRole::Admin))
+        .get_result::<GroupUser>(&mut self.conn);
+        match res {
+            Ok(..) => {
+                println!(
+                    "User {} made user {} admin in group {}",
+                    caller.name, new_admin.name, group_name
+                );
+                Ok(())
+            }
+            Err(..) => {
+                println!(
+                    "Error occured while making user {} new admin",
+                    new_admin_name
+                );
+                Err(())
+            }
+        }
+    }
 }

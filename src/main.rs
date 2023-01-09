@@ -91,6 +91,102 @@ fn main() -> Result<(), std::io::Error> {
                 }
             });
 
+        app.at("/set-admin")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in join group");
+                let SetAdminJson {
+                    caller_name,
+                    new_admin_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, New_admin_name is {}, Groupname is {}",
+                    caller_name, new_admin_name, group_name
+                );
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.set_admin(&caller_name, &new_admin_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error joining the group"),
+                    )),
+                }
+            });
+
+        app.at("/retire")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in retiring");
+                let UsernameGroupnameJson {
+                    caller_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, Groupname is {}",
+                    caller_name, group_name
+                );
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.retire(&caller_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error retiring"),
+                    )),
+                }
+            });
+
+            app.at("/leave")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in leaving");
+                let UsernameGroupnameJson {
+                    caller_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, Groupname is {}",
+                    caller_name, group_name
+                );
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.leave(&caller_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error leaving"),
+                    )),
+                }
+            });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             app.at("/delete-group")
             .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
                 println!("Got in leaving");

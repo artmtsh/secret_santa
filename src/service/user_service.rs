@@ -380,6 +380,7 @@ impl UserService {
             );
             return Err(());
         }
+        //todo
         use crate::schema::group_user::dsl::*;
         let mut user_id_vec = group_user
             .filter(group_id.eq(group.id))
@@ -429,5 +430,52 @@ impl UserService {
         }
         let len = arr.len();
         arr[len - 1] = first;
+    }
+    pub fn get_ward(
+        &mut self,
+        caller_name: &String,
+        group_name: &String,
+    ) -> Result<Option<User>, ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller.name, group.name);
+            return Err(());
+        }
+        use crate::schema::group_user::dsl::*;
+        let other_ward_id = group_user
+            .select(ward_id)
+            .filter(BoolExpressionMethods::and(
+                user_id.eq(caller.id),
+                group_id.eq(group.id),
+            ))
+            .get_result::<Option<i32>>(&mut self.conn)
+            .unwrap();
+        match other_ward_id {
+            Some(id) => {
+                println!("Got ward_id {} for user {}", id, caller.name);
+                Ok(UserService::new().get_user_by_id(&id))
+            }
+            None => {
+                println!("User {} has no ward id yet", caller.name);
+                Ok(None)
+            }
+        }
+    }
+    fn get_user_by_id(&mut self, user_id: &i32) -> Option<User> {
+        use crate::schema::users::dsl::*;
+        let user = users.filter(id.eq(user_id)).first::<User>(&mut self.conn);
+        match user {
+            Ok(u) => Some(u),
+            Err(..) => None,
+        }
     }
 }

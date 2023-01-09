@@ -2,17 +2,12 @@ pub mod json_structs;
 pub mod models;
 pub mod schema;
 pub mod service;
-
 use models::user::NewUser;
-
 use service::database_connection::Database;
 use service::user_service::UserService;
-
 use serde_json::json;
 use tide::Request;
-
 use std::sync::{Arc, Mutex};
-
 use json_structs::group_json::*;
 
 fn main() -> Result<(), std::io::Error> {
@@ -144,7 +139,7 @@ fn main() -> Result<(), std::io::Error> {
                 }
             });
 
-            app.at("/leave")
+        app.at("/leave")
             .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
                 println!("Got in leaving");
                 let UsernameGroupnameJson {
@@ -170,24 +165,7 @@ fn main() -> Result<(), std::io::Error> {
                 }
             });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            app.at("/delete-group")
+        app.at("/delete-group")
             .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
                 println!("Got in leaving");
                 let UsernameGroupnameJson {
@@ -252,7 +230,17 @@ fn main() -> Result<(), std::io::Error> {
                     "Caller_name is {}, Groupname is {}",
                     caller_name, group_name
                 );
-                ////
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.get_ward(&caller_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error starting the game"),
+                    )),
+                }
             });
 
         app.listen("127.0.0.1:8080").await

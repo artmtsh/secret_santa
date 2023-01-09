@@ -91,6 +91,74 @@ fn main() -> Result<(), std::io::Error> {
                 }
             });
 
+            app.at("/delete-group")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in leaving");
+                let UsernameGroupnameJson {
+                    caller_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, Groupname is {}",
+                    caller_name, group_name
+                );
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.delete_group(&caller_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error deleting the group"),
+                    )),
+                }
+            });
+
+        app.at("/start")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in leaving");
+                let UsernameGroupnameJson {
+                    caller_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, Groupname is {}",
+                    caller_name, group_name
+                );
+                let state = request.state();
+                let _guard = state.lock().unwrap();
+                let mut user_service = UserService::new();
+
+                match user_service.start_secret_santa(&caller_name, &group_name) {
+                    Ok(_) => Ok(json!(tide::StatusCode::Ok)),
+                    Err(..) => Err(tide::Error::from_str(
+                        tide::StatusCode::Conflict,
+                        json!("Error starting the game"),
+                    )),
+                }
+            });
+
+        app.at("/get-ward")
+            .put(|mut request: Request<Arc<Mutex<Database>>>| async move {
+                println!("Got in leaving");
+                let UsernameGroupnameJson {
+                    caller_name,
+                    group_name,
+                } = request.body_json().await.map_err(|e| {
+                    tide::Error::from_str(tide::StatusCode::BadRequest, json!(e.to_string()))
+                })?;
+                println!(
+                    "Caller_name is {}, Groupname is {}",
+                    caller_name, group_name
+                );
+                ////
+            });
+
         app.listen("127.0.0.1:8080").await
     };
     futures::executor::block_on(f)

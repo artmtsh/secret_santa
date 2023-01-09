@@ -241,4 +241,118 @@ impl UserService {
             }
         }
     }
+        pub fn retire(&mut self, caller_name: &String, group_name: &String) -> Result<(), ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller.name, group.name);
+            return Err(());
+        }
+        if !Self::is_admin(&caller, &group, &mut self.conn) {
+            println!(
+                "User {} already is not admin in group {}",
+                caller.name, group.name
+            );
+            return Err(());
+        }
+        if GroupService::new().count_admins(&group) <= 1 {
+            println!(
+                "User {} can not retire from the group {} due to litle number of admins",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        use crate::schema::group_user::dsl::*;
+        diesel::update(group_user.filter(BoolExpressionMethods::and(
+            user_id.eq(caller.id),
+            group_id.eq(group.id),
+        )))
+        .set(user_role.eq(UserRole::User))
+        .get_result::<GroupUser>(&mut self.conn);
+        println!("User {} was retired in group {}", caller.name, group_name);
+        Ok(())
+    }
+    pub fn leave(&mut self, caller_name: &String, group_name: &String) -> Result<(), ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller.name, group.name);
+            return Err(());
+        }
+        if Self::is_admin(&caller, &group, &mut self.conn)
+            && GroupService::new().count_admins(&group) <= 1
+        {
+            println!(
+                "User {} can not leave from the group {} due to litle number of admins",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        if group.status == GroupStatus::Closed {
+            println!(
+                "User {} can not leave from the group {} because it is closed",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        use crate::schema::group_user::dsl::*;
+        diesel::dsl::delete(group_user.filter(BoolExpressionMethods::and(
+            user_id.eq(caller.id),
+            group_id.eq(group.id),
+        )))
+        .get_result::<GroupUser>(&mut self.conn);
+        println!("User {} left the group {}", caller.name, group_name);
+        Ok(())
+    }
+    pub fn delete_group(&mut self, caller_name: &String, group_name: &String) -> Result<(), ()> {
+        if !Self::is_user_in_database(&caller_name) {
+            println!("User {} was not found in database", caller_name);
+            return Err(());
+        }
+        if !Self::is_group_in_database(&group_name) {
+            println!("Group {} was not found in database", group_name);
+            return Err(());
+        }
+        let caller = self.get_user_by_name(caller_name).unwrap();
+        let group = GroupService::new().get_group_by_name(group_name).unwrap();
+        if !Self::is_user_in_group(&caller, &group, &mut self.conn) {
+            println!("User {} was not found in group {}", caller.name, group.name);
+            return Err(());
+        }
+        if !Self::is_admin(&caller, &group, &mut self.conn) {
+            println!(
+                "User {} can not delete the group {} due to no admin rights",
+                caller.name, group_name
+            );
+            return Err(());
+        }
+        use crate::schema::groups::dsl::*;
+        diesel::dsl::delete(groups.filter(id.eq(group.id))).get_result::<Group>(&mut self.conn);
+        println!("User {} deleted the group {}", caller.name, group_name);
+        Ok(())
+    }
+    fn shift_left(arr: &mut Vec<i32>) {
+        let first = arr.first().unwrap().clone();
+        for i in 1..arr.len() {
+            arr[i - 1] = arr[i].clone();
+        }
+        let len = arr.len();
+        arr[len - 1] = first;
+    }
 }
